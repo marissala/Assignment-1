@@ -36,7 +36,7 @@ How did your models from last time perform? In this exercise you have to compare
 ### PREPARATIONS
 # Working directory and libraries
 setwd("~/Uni programming/Experimental Methods 3/Assignment-1")
-pacman::p_load(lmerTest,lme4,MuMIn,car,dplyr,plyr,stringr,modelr,caret)
+pacman::p_load(lmerTest,lme4,MuMIn,car,dplyr,plyr,stringr,modelr,caret,Metrics)
 
 d_train = read.csv("clean_dataset.csv")
 
@@ -133,7 +133,55 @@ m2 = lmer(CHI_MLU ~ VISIT + Diagnosis + (1+VISIT|SUBJ), d_train)
 
 ### CROSS-VALIDATED VERSION OF THE MODEL
 # Create folds
-folds = createFolds(d_train, 4)
+d_train$SUBJ = as.factor(d_train$SUBJ)
+folds = createFolds(unique(d_train$SUBJ), 4)
+d = d_train[d_train$SUBJ %in% folds]
+
+
+rmse_train = NULL
+rmse_test = NULL
+n = 1
+
+for(i in folds) {
+  #select data
+  dtraint = subset(d_train, !(SUBJ %in% i))
+  dtestt = subset(d_train, SUBJ %in% i)
+  #train model
+  modelt = lmer(CHI_MLU ~ VISIT*Diagnosis + (1+VISIT|SUBJ), dtraint)
+  #test the model, traindata
+  rmse_train[n] = Metrics::rmse(dtraint$CHI_MLU, fitted(modelt))
+  # testtada
+  rmse_test[n] = Metrics::rmse(dtestt$CHI_MLU, predict(modelt, dtestt, allow.new.levels=T))
+  #save the performance -- add to list c()
+  n=n+1
+}
+
+mean(rmse_train)                    #0.3482758
+mean(rmse_test)                     #0.7736723
+mean(rmse_test) - mean(rmse_train)  #0.4253965
+
+### LOOKOUTS FOR TOP MODEL
+rmse_train0 = NULL
+rmse_test0 = NULL
+n = 1
+
+for(i in folds) {
+  #select data
+  dtraint = subset(d_train, !(SUBJ %in% i))
+  dtestt = subset(d_train, SUBJ %in% i)
+  #train model
+  modelt = lmer(CHI_MLU ~ VISIT*Diagnosis + uADOS*verbalIQ + uADOS*Diagnosis + tokens_CHI + MOT_MLU + (1+VISIT|SUBJ), dtraint)
+  #test the model, traindata
+  rmse_train0[n] = Metrics::rmse(dtraint$CHI_MLU, fitted(modelt))
+  # testtada
+  rmse_test0[n] = Metrics::rmse(dtestt$CHI_MLU, predict(modelt, dtestt, allow.new.levels=T))
+  #save the performance -- add to list c()
+  n=n+1
+}
+
+mean(rmse_train0)
+mean(rmse_test0)
+mean(rmse_test0) - mean(rmse_train0)
 
 ```
 
@@ -152,6 +200,18 @@ You want to evaluate:
 - how does the child fare compared to the model predictions at Visit 6? Is the child below or above expectations? (tip: use the predict() function on Bernie's data only and compare the prediction with the actual performance of the child)
 
 ```{r}
+# dataset for bernie
+bernie = subset(d_test, SUBJ == 2)
+
+verbIQ = mean(subset(d_train, Diagnosis == "TD")$verbalIQ)
+CHI = mean(subset(d_train, Diagnosis == "TD")$CHI_MLU)
+
+#average kid dataset, avg VerbIQ and avg MLU
+kiddo = data.frame(SUBJ = rep(111,6), VISIT = c(1:6), Diagnosis = rep("TD", 6), verbalIQ = rep(verbIQ, 6))
+
+# predict MLU
+predict(modelt, kiddo, allow.new.levels=T)
+
 
 
 ```
