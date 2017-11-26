@@ -105,6 +105,15 @@ Describe the characteristics of the two groups of participants and whether the t
 # only visit 1's 
 d_temp = filter(d, VISIT == 1)
 
+# how many ASD and how many TD
+misasi = d_temp
+misasi$Diagnosis = as.character(misasi$Diagnosis)
+misasi$Diagnosis[misasi$Diagnosis=="TD"] = 1
+misasi$Diagnosis[misasi$Diagnosis=="ASDSD"] = 2
+
+a=count(misasi$Diagnosis == 1)
+# 29 asd ja 32 terved
+
 # age visuals
 ggplot(d_temp, aes(Diagnosis, Age)) + 
   geom_boxplot()

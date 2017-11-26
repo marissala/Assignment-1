@@ -34,20 +34,17 @@ How did your models from last time perform? In this exercise you have to compare
 
 ```{r}
 ### PREPARATIONS
-# Working directory and libraries
-setwd("~/Uni programming/Experimental Methods 3/Assignment-1")
+# Libraries
 pacman::p_load(lmerTest,lme4,MuMIn,car,dplyr,plyr,stringr,modelr,caret,Metrics)
 
 d_train = read.csv("clean_dataset.csv")
-
-
 
 ### RECREATE MODELS FROM LAST TIME
 m0 = lmer(CHI_MLU ~ VISIT + MOT_MLU + verbalIQ + (1+VISIT|SUBJ) + (1+MOT_MLU|SUBJ) + (1+verbalIQ|SUBJ), d_train)
 summary(m0)
 r.squaredGLMM(m0)
 # Find the root mean square error
-rmse(m0,d_train)
+modelr::rmse(m0,d_train)
 
 
 
@@ -58,7 +55,7 @@ dlength = read.csv("LU_test.csv")
 dword = read.csv("token_test.csv")
 
 # Rename
-ddemo = rename(ddemo, c(Child.ID = "SUBJ", Visit = "VISIT"))
+ddemo = plyr::rename(ddemo, c(Child.ID = "SUBJ", Visit = "VISIT"))
 
 # Visits become numbers
 dword$VISIT = str_extract(dword$VISIT, "\\d")
@@ -104,7 +101,7 @@ m1 = lmer(CHI_MLU ~ VISIT + MOT_MLU + verbalIQ + (1+VISIT|SUBJ) + (1+MOT_MLU|SUB
 summary(m1)
 r.squaredGLMM(m1)
 # Find the root mean square error
-rmse(m1,d_test)
+modelr::rmse(m1,d_test)
 
 ```
 
@@ -134,7 +131,7 @@ m2 = lmer(CHI_MLU ~ VISIT + Diagnosis + (1+VISIT|SUBJ), d_train)
 ### CROSS-VALIDATED VERSION OF THE MODEL
 # Create folds
 d_train$SUBJ = as.factor(d_train$SUBJ)
-folds = createFolds(unique(d_train$SUBJ), 4)
+folds = createFolds(unique(d_train$SUBJ), 5)
 d = d_train[d_train$SUBJ %in% folds]
 
 
@@ -200,20 +197,53 @@ You want to evaluate:
 - how does the child fare compared to the model predictions at Visit 6? Is the child below or above expectations? (tip: use the predict() function on Bernie's data only and compare the prediction with the actual performance of the child)
 
 ```{r}
-# dataset for bernie
+# Model again
+modelt = lmer(CHI_MLU ~ VISIT*Diagnosis + uADOS*verbalIQ + uADOS*Diagnosis + tokens_CHI + MOT_MLU + (1+VISIT|SUBJ), d_train) 
+
+# Get Bernie from test dataset, he's subject 2
 bernie = subset(d_test, SUBJ == 2)
+bernie$Diagnosis = as.factor(bernie$Diagnosis)
 
-verbIQ = mean(subset(d_train, Diagnosis == "TD")$verbalIQ)
-CHI = mean(subset(d_train, Diagnosis == "TD")$CHI_MLU)
+# Get mean of variables out of subsetted dataset with only TD's
+a_verbalIQ = mean(subset(d_train, Diagnosis == "TD")$verbalIQ)
+a_CHI_MLU = mean(subset(d_train, Diagnosis == "TD")$CHI_MLU)
+a_ADOS = mean(subset(d_train, Diagnosis == "TD")$uADOS)
+a_MOT_MLU = mean(subset(d_train, Diagnosis == "TD")$MOT_MLU)
+a_types_CHI = mean(subset(d_train, Diagnosis == "TD")$types_CHI)
+a_tokens_CHI = mean(subset(d_train, Diagnosis == "TD")$tokens_CHI)
 
-#average kid dataset, avg VerbIQ and avg MLU
-kiddo = data.frame(SUBJ = rep(111,6), VISIT = c(1:6), Diagnosis = rep("TD", 6), verbalIQ = rep(verbIQ, 6))
+# Average kiddo dataset
+kiddo = data.frame(SUBJ = rep(123,6), 
+                   VISIT = c(1:6), 
+                   Diagnosis = rep("ASD", 6), 
+                   verbalIQ = rep(a_verbalIQ, 6),
+                   uADOS = rep(a_ADOS, 6),
+                   MOT_MLU = rep(a_MOT_MLU, 6),
+                   types_CHI = rep(a_types_CHI, 6),
+                   tokens_CHI = rep(a_tokens_CHI, 6))
 
-# predict MLU
-predict(modelt, kiddo, allow.new.levels=T)
+# Predict CHI_MLU for the average kiddo based on the model
+(kiddo_MLU = predict(modelt, kiddo, allow.new.levels=T))
 
+# Predict CHI_MLU for Bernie
+(Bernie_pMLU = predict(modelt, bernie, allow.new.levels=T))
 
+# Find the absolute distance between average kid and Bernie for every visit
+## Plot the average kid and Bernie, Bernie is the dots and line represents the average kid
+plot(bernie$CHI_MLU, ylim = c(1,4)) +
+lines(kiddo_MLU)
+abs(kiddo_MLU - Bernie_pMLU)
+## He scores higher from average
 
+#- how does the child fare compared to the model predictions at Visit 6? Is the child below or above expectations? (tip: use the predict() function on Bernie's data only and compare the prediction with the actual performance of the child)
+# Predicted score for Bernie based on the model
+a = predict(modelt, bernie)[6]
+
+# Actual score of Bernie Visit 6
+b = bernie$CHI_MLU[6]
+
+# Absolute difference
+abs(a-b)
 ```
 
 
