@@ -39,6 +39,7 @@ Set the working directory (the directory with your data and code for these assig
 
 ```{r}
 setwd("~/Uni programming/Experimental Methods 3/Assignment-1")
+pacman::p_load(ggplot2,plyr,stringr,tidyverse,magrittr)
 ```
 
 Load the three data sets, after downloading them from dropbox and saving them in your working directory:
@@ -57,6 +58,21 @@ Explore the 3 datasets (e.g. visualize them, summarize them, etc.). You will see
 - the same variables might report the values in different ways (e.g. visit)
 Welcome to real world of messy data :-)
 
+```{r}
+# Try to visualize
+ggplot(dword, aes(tokens_CHI, SUBJ)) +
+  geom_line()
+
+ggplot(dword, aes(VISIT, tokens_MOT)) +   
+  geom_point()
+## Visits are doubled
+
+ggplot(dlength, aes(VISIT, MOT_MLU)) +   
+  geom_point()
+## Again - double visits
+
+```
+
 Before being able to combine the data sets we need to make sure the relevant variables have the same names and the same kind of values.
 
 So:
@@ -64,18 +80,16 @@ So:
 2a. Find a way to transform variable names.
 Tip: Look into the package data.table, or google "how to rename variables in R"
 
-
 ```{r}
-library(plyr)
-ddemo = rename(ddemo, c(Child.ID = "SUBJ", Visit = "VISIT"))
+# Rename demographic data subject and visit columns to match the ones for dlength and dword
+ddemo = plyr::rename(ddemo, c(Child.ID = "SUBJ", Visit = "VISIT"))
 ```
 
 2b. Find a way to homogeneize the way "visit" is reported. If you look into the original data sets, you will see that in the LU data and the Token data, Visits are called "visit 1" in stead of just 1 (which is the case in the demographic data set).
 Tip: There is a package called stringr, which will be very handy for you also in future assignments. We will return to this package later, but for now use the str_extract () to extract only the number from the variable Visit in each data set. Tip: type ?str_extract() after loading the library, for examples of how to use it.
 
 ```{r}
-library(stringr)
-# the lines mean to only choose this and the d is digit so it leaves in only the numbers
+# Remove everything but the numbers of visits: the lines mean to only choose this and the d is digit so it leaves in only the numbers
 dword$VISIT = str_extract(dword$VISIT, "\\d")
 dlength$VISIT = str_extract(dlength$VISIT, "\\d")
 ```
@@ -89,9 +103,8 @@ Tip: A possible solution has one line of code for each child name that is to be 
 
 Tip: You will have to do identical work for both data sets, so to save time on the copy/paste use the cmd+f/ctrl+f function. Add the data frame name (e.g. LU_data) in the first box, and the data frame name (e.g. Tokens_data) you wish to change it to in the other box, and press replace. 
 
-
-
 ```{r}
+# Remove all dots from the subject names (because A.D. is the same as AD)
 dlength$SUBJ = gsub("\\.", "", dlength$SUBJ)
 dword$SUBJ = gsub("\\.", "", dword$SUBJ)
 ddemo$SUBJ = gsub("\\.", "", ddemo$SUBJ)
@@ -112,10 +125,10 @@ The variables we need are: Child.ID, Visit, Ethnicity, Diagnosis, Gender, Age, A
 It would be smart to rename the MullenRaw and ExpressiveLangRaw into something you can remember (i.e. nonVerbalIQ, verbalIQ)
 
 ```{r}
-library(tidyverse)
-r = select(ddemo, SUBJ, VISIT, Ethnicity, Diagnosis, Gender, Age, ADOS, MullenRaw, ExpressiveLangRaw)
-m = select(dlength, SUBJ, VISIT, MOT_MLU, MOT_LUstd, CHI_MLU, CHI_LUstd)
-s = select(dword, SUBJ, VISIT, types_MOT, types_CHI, tokens_MOT, tokens_CHI)
+# From each dataframe, select the variables you want to use, make dataframes
+A = select(ddemo, SUBJ, VISIT, Ethnicity, Diagnosis, Gender, Age, ADOS, MullenRaw, ExpressiveLangRaw)
+B = select(dlength, SUBJ, VISIT, MOT_MLU, MOT_LUstd, CHI_MLU, CHI_LUstd)
+C = select(dword, SUBJ, VISIT, types_MOT, types_CHI, tokens_MOT, tokens_CHI)
 ```
 
 2e. Finally we are ready to merge all the data sets into just one. 
@@ -125,8 +138,9 @@ Tip: Merge only works for two data frames at the time.
 Tip: Check the number of observations in the datasets before and after merging. What is going on?
 
 ```{r}
-i = merge(r, m)
-i = merge(i, s)
+# Merge together in 2 steps because merge() can't handle otherwise
+i = merge(A, B)
+i = merge(i, C)
 ```
 
 Are we done yet?
@@ -140,13 +154,15 @@ Tip: the final dataset should have as many rows as the the old one.
 
 
 ```{r}
-library(plyr)
+# New dataframe of only visit 1's
 newdata = i[i$VISIT == 1,]
+# Rename the variables you'll merge with the big dataframe
 newdata = plyr::rename(newdata, c(ADOS = "uADOS", MullenRaw = "nonVerbalIQ", ExpressiveLangRaw = "verbalIQ"))
+# Merge
 i = merge(i, select(newdata, SUBJ, uADOS, nonVerbalIQ, verbalIQ), by = "SUBJ")
 
-# delete old columns
-i = subset(d, select=-c(ADOS, MullenRaw, ExpressiveLangRaw))
+# Delete old columns
+i = subset(i, select=-c(ADOS, MullenRaw, ExpressiveLangRaw))
 ```
 
 Now, we are almost ready to actually start working with the data. However, here are some additional finishing touches:
@@ -162,13 +178,26 @@ Tip: Google "how to rename levels in R".
 ```{r}
 # change names to numbers, factors makes it into levels and numeric makes the levels into numbers
 i$SUBJ = as.numeric(as.factor(i$SUBJ))
-# visits numeric
+
+# Visits numeric
 i$VISIT=as.numeric(i$VISIT)
-# genders and diagnosis
+
+# Gender and diagnosis
 i$Gender[i$Gender==2] = "F"
 i$Gender[i$Gender==1] = "M"
 i$Diagnosis = gsub("A", "ASD", i$Diagnosis)
 i$Diagnosis = gsub("B", "TD", i$Diagnosis)
+
+# To factors
+i$Diagnosis = as.factor(i$Diagnosis)
+i$Gender = as.factor(i$Gender)
+
+# Plot to check
+counts = table(i$Gender, i$Diagnosis)
+barplot(counts,
+        col=c("green","blue"),
+        legend = rownames(counts))
+
 ```
 
 
@@ -191,10 +220,12 @@ List all kids who:
 3. have not completed all trials. Tip: Use pipes to solve this
 
 ```{r}
-# () around it both display it and make a dataframe(or variable)
-(chi_1 = i %>%
+## 1 kids who have a mean length of utterance (across all visits) of more than 2.7 morphemes
+i$SUBJ = as.factor(i$SUBJ)
+i %>%
    group_by(SUBJ) %>%
-   filter(mean(CHI_MLU) > 2.7))  ## summarise(MEAN = mean(CHI_MLU)) %>%
+   filter(CHI_MLU > 2.7) %>%
+   select(SUBJ) ## summarise(MEAN = mean(CHI_MLU)) %>%
 # list of the subjects            ## filter(MEAN > 2.7)
 levels(as.factor(chi_1$SUBJ))
 
