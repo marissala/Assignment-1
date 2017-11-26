@@ -72,9 +72,8 @@ Load necessary libraries : what will you need?
 - e.g. mixed effects models
 
 ```{r Load Libraries}
-setwd("~/Uni programming/Experimental Methods 3/Assignment-1")
 library(plyr); library(tidyverse); library(lmerTest)
-pacman::p_load(lmerTest, lme4,MuMIn,car,dplyr)
+pacman::p_load(lmerTest,lme4,MuMIn,car,dplyr)
 ```
 
 ### Define your working directory and load the data
@@ -86,10 +85,11 @@ pacman::p_load(lmerTest, lme4,MuMIn,car,dplyr)
 
 ```{r Load Data}
 
-#getwd()
-#locpath=
-#setwd(locpath)
 d = read_csv("clean_dataset.csv")
+d$SUBJ = as.factor(d$SUBJ)
+d$VISIT = as.factor(d$VISIT)
+d$Diagnosis = as.factor(d$Diagnosis)
+d$Gender = as.factor(d$Gender)
 
 ```
 
@@ -102,59 +102,75 @@ Make sure the variables are in the right format.
 Describe the characteristics of the two groups of participants and whether the two groups are well matched.
 
 ```{r}
-# only visit 1's 
+# Only visit 1's 
 d_temp = filter(d, VISIT == 1)
 
-# how many ASD and how many TD
+# How many have ASD and how many are TD
 misasi = d_temp
+## Change TD and ASD into numbers to count them
 misasi$Diagnosis = as.character(misasi$Diagnosis)
-misasi$Diagnosis[misasi$Diagnosis=="TD"] = 1
-misasi$Diagnosis[misasi$Diagnosis=="ASDSD"] = 2
+misasi$Diagnosis[misasi$Diagnosis=="TD"] = 0
+misasi$Diagnosis[misasi$Diagnosis=="ASD"] = 1
+misasi$Diagnosis = as.factor(misasi$Diagnosis)
 
-a=count(misasi$Diagnosis == 1)
-# 29 asd ja 32 terved
+table(misasi$Diagnosis)
+# TD percentage
+32*100/61
+# ASD percentage
+29*100/61
 
-# age visuals
+```
+
+32 are TD (52%) and 29 have ASD (48%)
+
+```{r}
+# Visualize age
 ggplot(d_temp, aes(Diagnosis, Age)) + 
   geom_boxplot()
 
 ggplot(d_temp, aes(Diagnosis, Age)) +
   geom_violin()
-# age
-d_temp$Age = as.numeric(d_temp$Age)
-summary(lm(Age~Diagnosis, d)) #significant
 
-# gender
-counts = table(d_temp$Gender, d_temp$Diagnosis)
-barplot(counts,
-        col=c("green","blue"),
-        legend = rownames(counts))
-d_temp$Diagnosis = as.factor(d_temp$Diagnosis)
-d_temp$Gender = as.factor(d_temp$Gender)
-summary(glm(Gender~Diagnosis, family = binomial, data = d_temp)) # not significantly different
+# Age summary
+summary(lm(Age ~ Diagnosis, d_temp))
 
+```
+
+Significantly different ages for ASD and TD. TD children are generally -12.63 months younger that ASD kids. Violin plot shows that TD's were mostly very young, rather than mean of age.
+
+```{r}
 # Check how many males/females in ASD and TD
 (M = d_temp %>%
   group_by(Diagnosis) %>%
   count(Gender == "M"))
 
-# verbal non verbal IQ visuals
+# Plot gender
+counts = table(d_temp$Gender, d_temp$Diagnosis)
+barplot(counts,
+        col=c("green","blue"),
+        legend = rownames(counts))
+
+# Gender summary
+summary(glm(Gender~Diagnosis, family = binomial, data = d_temp)) # not significantly different
+```
+
+In the two groups, gender is well balanced. The plot shows there are more males in both conditions. Gender-wise the groups are balanced.
+
+```{r}
+# Verbal IQ visuals
 ggplot(d_temp, aes(Diagnosis, verbalIQ)) +
   geom_violin()
-# lm
+# Verbal IQ summary
 summary(glm(verbalIQ~Diagnosis, family = gaussian, d_temp)) # not significant
 
+# Non verbal IQ visuals
 ggplot(d_temp, aes(Diagnosis, nonVerbalIQ)) +
   geom_violin()
+# Non verbal IQ summary
 summary(glm(nonVerbalIQ~Diagnosis, family = gaussian, d_temp)) # not significant
 
-# race
-d_temp$Ethnicity = as.factor(d_temp$Ethnicity)
-d_temp$Diagnosis = as.factor(d_temp$Diagnosis)
-plot(d_temp$Diagnosis, d_temp$Ethnicity)
-summary(lm(Ethnicity~Diagnosis, d_temp))
-
 ```
+The violin plot shows some disbalance for TD in verbal IQ. For non verbal IQ both plots seem a bit less balanced and not balanced in the same way, although the main mass of the kids seems to be in the same place for nonVerbalIQ value (around 25-30) where TD's have it a bit higher than ASD's. However, both GLM analysis summarys show no significant difference between the conditions for both verbal and non verbal IQ.
 
 ## Exercise 1) Preliminary Data Exploration
 
@@ -178,7 +194,15 @@ Remember to plot the data first and then to run a statistical test.
 - Which variable(s) should be included as random factors?
 
 ```{r}
-m1 = lmer(CHI_MLU ~ VISIT + Diagnosis + (1+VISIT|SUBJ), d)
+# Plot MLU changes over time
+ggplot(d, aes(VISIT, CHI_MLU)) +
+  geom_boxplot()
+
+# Plot MLU changes according to diagnosis
+ggplot(d, aes(Diagnosis, CHI_MLU)) +
+  geom_boxplot()
+
+m1 = lm(CHI_MLU ~ VISIT + Diagnosis + (1+VISIT|SUBJ), d)
 summary(m1)
 
 ```
@@ -236,6 +260,6 @@ r.squaredGLMM(m4)
 
 anova(m4, m3)
 
- ```
+```
 
 REPORT OF THE RESULTS
