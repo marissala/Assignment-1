@@ -38,7 +38,7 @@ N.B. Create a GitHub repository for the Language Development in ASD set of assig
 Set the working directory (the directory with your data and code for these assignments):
 
 ```{r}
-setwd("~/Uni programming/Experimental Methods 3/Assignment-1")
+#setwd("~/Uni programming/Experimental Methods 3/Assignment-1") ##Can't change wd after using version control
 pacman::p_load(ggplot2,plyr,stringr,tidyverse,magrittr)
 ```
 
@@ -152,7 +152,6 @@ Tip: one solution requires you to select only the rows corresponding to visit 1 
 Tip: subset() and select() might be useful.
 Tip: the final dataset should have as many rows as the the old one.
 
-
 ```{r}
 # New dataframe of only visit 1's
 newdata = i[i$VISIT == 1,]
@@ -176,7 +175,7 @@ Tip: as.numeric() might be a useful function, but not alone.
 Tip: Google "how to rename levels in R".
 
 ```{r}
-# change names to numbers, factors makes it into levels and numeric makes the levels into numbers
+# Change names to numbers, factors makes it into levels and numeric makes the levels into numbers
 i$SUBJ = as.numeric(as.factor(i$SUBJ))
 
 # Visits numeric
@@ -207,7 +206,6 @@ Save the data set using into a csv file. Hint: look into write.csv()
 write.csv(i, file ="clean_dataset.csv")
 ```
 
-
 3) Now that we have a nice clean data set to use for the analysis next week, we shall play a bit around with it. The following exercises are not relevant for the analysis, but are here so you can get familiar with the functions within the tidyverse package.
 
 Here's the link to a very helpful book, which explains each function:
@@ -220,25 +218,26 @@ List all kids who:
 3. have not completed all trials. Tip: Use pipes to solve this
 
 ```{r}
-## 1 kids who have a mean length of utterance (across all visits) of more than 2.7 morphemes
+# 1 kids who have a mean length of utterance (across all visits) of more than 2.7 morphemes
 i$SUBJ = as.factor(i$SUBJ)
-i %>%
-   group_by(SUBJ) %>%
-   filter(CHI_MLU > 2.7) %>%
-   select(SUBJ) ## summarise(MEAN = mean(CHI_MLU)) %>%
-# list of the subjects            ## filter(MEAN > 2.7)
-levels(as.factor(chi_1$SUBJ))
 
-# use AND operator
-chi_2 = filter(i, CHI_MLU < 1.5 & VISIT == 1)
-levels(as.factor(chi_2$SUBJ))
+## Group by subject, find the mean for each kid across visits, filter by CHI_MLU > 2.7
+temp = group_by(i, SUBJ) %>%
+  summarise_each(funs(mean(., na.rm = TRUE)), CHI_MLU) %>%
+  filter(CHI_MLU > 2.7)
 
-# first create groups by how many visits they made and then take only the ones that had less than 6 visits
-chi_3 = i %>%
-  group_by(VISIT) %>%
-  filter(VISIT < 6)
+# 2. have a mean length of utterance of less than 1.5 morphemes at the first visit
+## Use AND operator for CHI_MLU lower than 1.5 and Visit equal to 1, select the 3 relevant columns
+temp = filter(i, CHI_MLU < 1.5 & VISIT == 1) %>%
+  select(SUBJ, VISIT, CHI_MLU)
+
+# 3. have not completed all trials. Tip: Use pipes to solve this
+## Find the sum of VISIT for all kids, select only the ones where sum of visit is less than 21
+temp = i %>%
+  group_by(SUBJ) %>%
+  summarise_each(funs(sum(., na.rm = TRUE)), VISIT) %>%
+  filter(VISIT < 21)
 ```
-
 
 USING ARRANGE
 
@@ -246,21 +245,13 @@ USING ARRANGE
 2. Sort kids to find the kid who produced the least amount of words on the 1st visit.
 
 ```{r}
-# arranges in a descending order by tokens,
-# filters by taking only the rows that show visit 6,
-# selects from those only 3 columns,
-# [1,] displays only 1st row
-chi_1a = select(filter((arrange(i, -tokens_CHI)), VISIT == 6), SUBJ, VISIT, tokens_CHI)[1,]
+# 1. Sort kids to find the kid who produced the most words on the 6th visit
+## Arranges in a descending order by tokens, filters by taking only the rows that show visit 6, selects from those only 3 columns, [1,] displays only 1st row
+temp = select(filter((arrange(i, -tokens_CHI)), VISIT == 6), SUBJ, VISIT, tokens_CHI)[1,]
 
-na.omit(data)
-data %>%
-  group_by(SUBJ) %>%
-  tally %>% # wraps rows to one kid
-  filter(n < 6)
-
-# arrange() - when there is a minus sign before the thing then it decreases, when not then increases
-chi_2a = select(filter((arrange(i, tokens_CHI)), VISIT == 1), SUBJ, VISIT, tokens_CHI)[1,]
-
+# 2. Sort kids to find the kid who produced the least amount of words on the 1st visit.
+## arrange() - when there is a minus sign before the thing then it decreases, when not then increases
+temp = select(filter((arrange(i, tokens_CHI)), VISIT == 1), SUBJ, VISIT, tokens_CHI)[1,]
 ```
 
 USING SELECT
@@ -269,12 +260,13 @@ USING SELECT
 2. What happens if you include the name of a variable multiple times in a select() call?
 
 ```{r}
-chi_1b = filter(select(i, SUBJ, Diagnosis, CHI_MLU, tokens_CHI), Diagnosis == "ASD")
+# 1. Make a subset of the data including only kids with ASD, mlu and word tokens
+temp = filter(select(i, SUBJ, Diagnosis, CHI_MLU, tokens_CHI), Diagnosis == "ASD")
 
-chi_2b = select(i, SUBJ, SUBJ, SUBJ)
-# it only appears as one column
+# 2. What happens if you include the name of a variable multiple times in a select() call?
+temp = select(i, SUBJ, SUBJ, SUBJ)
+## It only appears as one column
 ```
-
 
 USING MUTATE, SUMMARISE and PIPES
 1. Add a column to the data set that represents the mean number of words spoken during all visits.
@@ -282,7 +274,10 @@ USING MUTATE, SUMMARISE and PIPES
 3. The solution to task above enables us to assess the average amount of words produced by each child. Why don't we just use these average values to describe the language production of the children? What is the advantage of keeping all the data?
 
 ```{r}
-# 1.a.ambiguous question so if i take all words spoken by both mom and kid then whole average
+### UNDONE PART ###
+
+# 1. Add a column to the data set that represents the mean number of words spoken during all visits.
+#1.a.ambiguous question so if i take all words spoken by both mom and kid then whole average
 i = i %>% 
   group_by(SUBJ) %>% 
   mutate(avgWords_MOMCHI = mean(tokens_CHI+tokens_MOT))
