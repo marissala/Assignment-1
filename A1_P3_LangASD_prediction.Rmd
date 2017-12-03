@@ -230,8 +230,7 @@ kiddo = data.frame(SUBJ = rep(123,6),
 
 # Find the absolute distance between average kid and Bernie for every visit
 ## Plot the average kid and Bernie, Bernie is the dots and line represents the average kid
-plot(bernie$CHI_MLU, ylim = c(1,4)) +
-lines(kiddo_MLU)
+plot(bernie$CHI_MLU, ylim = c(1,4)) + lines(kiddo_MLU)
 abs(kiddo_MLU - Bernie_pMLU)
 ## He scores higher from average
 
