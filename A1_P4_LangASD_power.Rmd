@@ -1,0 +1,176 @@
+---
+title: "Assignment 1 - Language Development in ASD - part 4"
+author: "Riccardo Fusaroli"
+date: "August 10, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Welcome to the fourth exciting part of the Language Development in ASD exercise
+
+In this exercise we will assess how many participants we would need to adequately replicate our findings (ensuring our sample size is adequate, our alpha at 0.05 and our beta at 0.8).
+
+### Exercise 1
+
+How much power does your study have (if your model estimates are quite right)?
+- [GitHub]Load your dataset, fit your favorite model, assess power for your main effects and interactions of interest.
+- Report the power analysis and comment on what you can (or cannot) use its estimates for.
+
+```{r}
+# Libraries
+pacman::p_load(lmerTest,lme4,MuMIn,car,dplyr,plyr,stringr,modelr,caret,Metrics,pwr,simr,MASS,tidyverse,merTools)
+
+d = read.csv("clean_dataset.csv")
+
+### FIT MODEL
+model = lmer(CHI_MLU ~ VISIT*uADOS + tokens_CHI + MOT_MLU + (1+VISIT|SUBJ), d)
+summary(model)
+
+# Effect size
+r.squaredGLMM(model)
+
+length(unique(d$SUBJ))
+
+#Test power with current beta-values
+powerVisit = powerSim(model,fixed("VISIT"),nsim = 100)
+poweruADOS = powerSim(model,fixed("uADOS"),nsim = 100)
+powerVisituADOS = powerSim(model,fixed("VISIT:uADOS"),nsim = 100)
+powertokens_CHI = powerSim(model,fixed("tokens_CHI"),nsim = 100)
+powerMOT_MLU = powerSim(model,fixed("MOT_MLU"),nsim = 100)
+
+powerVisit
+poweruADOS
+powerVisituADOS
+powertokens_CHI
+powerMOT_MLU
+
+```
+
+
+### Exercise 2
+
+How would you perform a more conservative power analysis?
+- Identify and justify a minimum effect size for each of your relevant effects
+- [GitHub] take the model from exercise 1 and replace the effects with the minimum effect size that you'd accept.
+- [GitHub] assess the power curve by Child.ID, identifying an ideal number of participants to estimate each effect
+- OPTIONAL if your power estimates do not reach an acceptable threshold simulate additional participants and repeat the previous analysis
+- Report the power analysis and comment on what you can (or cannot) use its estimates for.
+
+```{r}
+### Riccardo's clumsy function to simulate new participants
+### TO DO points are only notes for myself, so not part of the assignment
+
+createNewData <- function (participants,visits,model){
+  # participants is the number of subjects
+  # visits is the number of visits
+  # TO DO: LOOP THROUGH ALL FE ROWS AND AUTOMATICALLY EXTRACT NAMES OF FIXED EFFECTS AND ESTIMATES
+  fe <- fixef(model)
+  Intercept <- fe[1] #intercept
+  bVisit <- fe[2] #visit
+  bDiagnosis <- fe[3] #diagnosis
+  bVisitDiagnosis <- fe[4] #visit diagnosis interaction
+  # TO DO: INTEGRATE STANDARD ERROR?
+  
+  # TO DO: LOOP THROUGH ALL VC COMPONENTS AND AUTOMATICALLY EXTRACT NAMES OF EFFECTS AND ESTIMATES
+  vc<-VarCorr(model) # variance component
+  sigmaSubject <- as.numeric(attr(vc[[1]],"stddev")[1]) # random intercept by subject
+  sigmaVisit <- as.numeric(attr(vc[[1]],"stddev")[2]) # random slope of visit over subject
+  sigmaResiduals <- as.numeric(attr(vc,"sc"))
+  sigmaCorrelation <- as.numeric(attr(vc[[1]],"correlation")[2])
+  
+  # Create an empty dataframe
+  d=expand.grid(VISIT=1:visits,SUBJ=1:participants)
+  # Randomly sample from a binomial (to generate the diagnosis)
+  condition <- sample(rep(0:1, participants/2))
+  d$Diagnosis<-condition[d$SUBJ]
+  d$Diagnosis[is.na(d$Diagnosis)]<-1
+  
+  ## Define variance covariance matrices:
+  Sigma.u<-matrix(c(sigmaSubject^2,
+                    sigmaCorrelation*sigmaSubject*sigmaVisit,
+                    sigmaCorrelation*sigmaSubject*sigmaVisit,
+                    sigmaVisit^2),nrow=2)
+  
+  ## generate new fake participants (column1=RandomIntercept, column2=RandomSlope)
+  u<-mvrnorm(n=participants,
+             mu=c(0,0),Sigma=cov(ranef(model)$SUBJ))
+  
+  ## now generate fake data:
+  ### the outcome is extracted from a gaussian with
+  ### the solution to the model's equation as mean and
+  ### the residual standard deviation as standard deviation 
+  d$CHI_MLU <- rnorm(participants*visits,
+                     (Intercept+u[,1]) +
+                     (bVisit+u[,2])*d$VISIT + 
+                     bDiagnosis*d$Diagnosis ,sigmaResiduals)  
+  
+  return(d)
+}
+
+# Simulate new data
+simD = createNewData(100, 6, model)
+
+# Fit model to simulated data
+sim_model = lmer(CHI_MLU ~ VISIT*Diagnosis + (1+VISIT|SUBJ), simD)
+summary(sim_model)
+
+# Check the effect sizes
+fixef(sim_model)
+
+# New smallest interesting effect sizes
+fixef(sim_model)["VISIT"] <- 0.1
+fixef(sim_model)["Diagnosis"] <- 0.1
+fixef(sim_model)["VISIT:Diagnosis"] <- 0.1
+
+# Calculate power again
+powerCurveV = powerCurve(sim_model, fixed("VISIT"), along="SUBJ", nsim=50)
+plot(powerCurveV) # with 20 subjects we're over the 80% line, with almost 50 we reach 100%
+```
+
+```{r}
+# Repeat the same thing on my own model
+model = lmer(CHI_MLU ~ VISIT*uADOS + tokens_CHI + MOT_MLU + (1+VISIT|SUBJ), d)
+
+powerVisit
+poweruADOS
+powerVisituADOS
+powertokens_CHI
+powerMOT_MLU
+
+# New smallest interesting effect sizes
+fixef(model)["VISIT"] <- 0.095
+fixef(model)["uADOS"] <- 0.012
+fixef(model)["VISIT:uADOS"] <- -0.007
+fixef(model)["tokens_CHI"] <- 0.0008
+fixef(model)["MOT_MLU"] <- 0.15
+
+# Calculate power again
+powerCurveV = powerCurve(model, fixed("VISIT"), along="SUBJ", nsim=100)
+powerCurveuADOS = powerCurve(model, fixed("uADOS"), along="SUBJ", nsim=100)
+powerCurveV_uADOS = powerCurve(model, fixed("VISIT:uADOS"), along="SUBJ", nsim=100)
+powerCurvetokens_CHI = powerCurve(model, fixed("tokens_CHI"), along="SUBJ", nsim=100)
+powerCurveMOT_MLU = powerCurve(model, fixed("MOT_MLU"), along="SUBJ", nsim=100)
+
+plot(powerCurveV) # with 20 subjects we're over the 80% line, with almost 50 we reach 100%
+plot(powerCurveuADOS)
+plot(powerCurveV_uADOS)
+plot(powerCurvetokens_CHI)
+plot(powerCurveMOT_MLU)
+```
+
+
+### Exercise 3
+
+Assume you have only the resources to collect 30 kids (15 with ASD and 15 TDs). Identify the power for each relevant effect and discuss whether it's worth to run the study and why.
+
+```{r}
+# Plot the powercurves again and see if 30 is enough to find these minimal effect sizes
+plot(powerCurveV) # enough
+plot(powerCurveuADOS) # not enough
+plot(powerCurveV_uADOS) # not enough
+plot(powerCurvetokens_CHI) # enough
+plot(powerCurveMOT_MLU) # not enough
+```
