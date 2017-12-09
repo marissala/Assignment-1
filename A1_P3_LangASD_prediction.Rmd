@@ -134,7 +134,6 @@ d_train$SUBJ = as.factor(d_train$SUBJ)
 folds = createFolds(unique(d_train$SUBJ), 5)
 d = d_train[d_train$SUBJ %in% folds]
 
-
 rmse_train = NULL
 rmse_test = NULL
 n = 1
