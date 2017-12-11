@@ -39,15 +39,6 @@ pacman::p_load(lmerTest,lme4,MuMIn,car,dplyr,plyr,stringr,modelr,caret,Metrics)
 
 d_train = read.csv("clean_dataset.csv")
 
-### RECREATE MODELS FROM LAST TIME
-m0 = lmer(CHI_MLU ~ VISIT + MOT_MLU + verbalIQ + (1+VISIT|SUBJ) + (1+MOT_MLU|SUBJ) + (1+verbalIQ|SUBJ), d_train)
-summary(m0)
-r.squaredGLMM(m0)
-# Find the root mean square error
-modelr::rmse(m0,d_train)
-
-
-
 ### CLEANING DATASETS
 # Read in data
 ddemo = read.csv("demo_test.csv")
@@ -94,14 +85,18 @@ i$Diagnosis = gsub("B", "TD", i$Diagnosis)
 
 d_test = i
 
-
+### RECREATE MODELS FROM LAST TIME
+m0 = lmer(CHI_MLU ~ VISIT*uADOS + tokens_CHI + MOT_MLU + verbalIQ + (1+VISIT|SUBJ), d_train)
+summary(m0)
+r.squaredGLMM(m0)
+# Find the root mean square error
+pred <- predict(m0, d_train, allow.new.levels = TRUE)
+Metrics::rmse(pred,d_train$CHI_MLU)
 
 ### TEST PERFORMANCE FOR TEST DATA
-m1 = lmer(CHI_MLU ~ VISIT + MOT_MLU + verbalIQ + (1+VISIT|SUBJ) + (1+MOT_MLU|SUBJ) + (1+verbalIQ|SUBJ), d_test)
-summary(m1)
-r.squaredGLMM(m1)
 # Find the root mean square error
-modelr::rmse(m1,d_test)
+test_pred <- predict(m0, d_test, allow.new.levels = TRUE)
+Metrics::rmse(test_pred,d_test$CHI_MLU)
 
 ```
 
@@ -166,7 +161,7 @@ for(i in folds) {
   dtraint = subset(d_train, !(SUBJ %in% i))
   dtestt = subset(d_train, SUBJ %in% i)
   #train model
-  modelt = lmer(CHI_MLU ~ VISIT*Diagnosis + uADOS*verbalIQ + uADOS*Diagnosis + tokens_CHI + MOT_MLU + (1+VISIT|SUBJ), dtraint)
+  modelt = lmer(CHI_MLU ~ VISIT*Diagnosis + verbalIQ*nonVerbalIQ + (1+VISIT|SUBJ), dtraint)
   #test the model, traindata
   rmse_train0[n] = Metrics::rmse(dtraint$CHI_MLU, fitted(modelt))
   # testtada
