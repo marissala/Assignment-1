@@ -277,21 +277,16 @@ USING MUTATE, SUMMARISE and PIPES
 ### UNDONE PART ###
 
 # 1. Add a column to the data set that represents the mean number of words spoken during all visits.
-#1.a.ambiguous question so if i take all words spoken by both mom and kid then whole average
 i = i %>% 
-  group_by(SUBJ) %>% 
-  mutate(avgWords_MOMCHI = mean(tokens_CHI+tokens_MOT))
-# 1.b. all words all visits for KID
-i = i %>% 
-  group_by(SUBJ) %>% 
+  group_by(VISIT) %>% 
   mutate(avgWords_CHI = mean(tokens_CHI))
 
 # 2. add a column containing the mean amount of words produced by each trial across all visits. HINT: group by Child.ID
 i = i %>%
-  group_by(VISIT) %>%
-  mutate(avg_Words_perTrial = mean(tokens_CHI))
+  group_by(SUBJ) %>%
+  mutate(avgWords_Subj = mean(tokens_CHI))
 
 # 3. The solution to task above enables us to assess the average amount of words produced by each child. Why don't we just use these average values to describe the language production of the children? What is the advantage of keeping all the data?
-# So I'm not sure how correct my solution is but I think keeping all the other data is good when you want to include more variables into the ASD model than just words per trial (to get a more accurate model)
+# So I'm not sure how correct my solution is but I think keeping all the other data is good when you want to include more variables into the ASD model than just words per trial (to get a more accurate model). Also interactions could be relevant to take into account and for that it is nice to have different kinds of averages (depending on interaction).
 
 ```

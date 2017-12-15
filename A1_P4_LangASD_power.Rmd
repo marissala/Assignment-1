@@ -131,7 +131,7 @@ plot(powerCurveV) # with 20 subjects we're over the 80% line, with almost 50 we 
 ```
 
 ```{r}
-# Repeat the same thing on my own model
+# I won't repeat this on my own model but I will decide on smaller effect sizes and find the power then
 model = lmer(CHI_MLU ~ VISIT*uADOS + tokens_CHI + MOT_MLU + (1+VISIT|SUBJ), d)
 
 powerVisit
